@@ -2,6 +2,7 @@ package domain
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/nyaruka/phonenumbers"
 )
@@ -35,7 +36,7 @@ func (pn PhoneNumber) Validate() error {
 	// DefaultRegion plays no role here.
 	phone, err := phonenumbers.Parse(string(pn), DefaultRegion)
 	if err != nil {
-		return err
+		return fmt.Errorf("%w: %w", ErrInvalidPhoneNumber, err)
 	}
 
 	if !phonenumbers.IsValidNumber(phone) {

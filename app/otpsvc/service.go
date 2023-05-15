@@ -13,39 +13,55 @@ import (
 	"github.com/alextanhongpin/go-service-oriented-package/domain"
 )
 
+const otpKey = "otp:%s:phone:%s:otp:%s"
+const rateLimitKey = "otp:%s:phone:%s:ratelimit"
+const DefaultOtpTTL = 3 * time.Minute
+
 var (
-	ErrKeyNotFound = errors.New("cache: key not found")
-	ErrOTPNotFound = errors.New("otp: not found")
-	ErrCooldown    = errors.New("otp: cooldown")
+	// NOTE: The adapter is responsible for returning the correct error type.
+	// The service package should not depend on external dependencies.
+	ErrKeyNotFound        = errors.New("cache: key not found")
+	ErrOTPNotFound        = errors.New("otp: not found")
+	ErrOTPTooManyRequests = errors.New("otp: too many requests")
 )
 
+//go:generate mockery --name smsProvider --case underscore --exported=true
 type smsProvider interface {
 	Send(ctx context.Context, phoneNumber, message string) error
 }
 
+//go:generate mockery --name cache --case underscore --exported=true
 type cache interface {
 	Inc(ctx context.Context, key string) (int64, error)
 	Set(ctx context.Context, key string, val string, ttl time.Duration) error
 	Get(ctx context.Context, key string) (string, error)
 	Del(ctx context.Context, key string) error
+	TTL(ctx context.Context, key string) (time.Duration, error)
+}
+
+type Config struct {
+	// Domain specific identifier, e.g. withdrawal/payment.
+	// This is used to ensure no concurrent request is made.
+	Domain string `example:"payout"`
+
+	// The app name, to be shown in the OTP.
+	App string `example:"MyApp"`
+
+	// The specific template for this OTP message
+	Template string `example:"Your %s code is %d"`
 }
 
 type Service struct {
+	config      Config
 	cache       cache
 	smsProvider smsProvider
-
-	// Domain specific identifier, e.g. withdrawal/payment.
-	// This is used to ensure no concurrent request is made.
-	domain string
-
-	// The specific template for this OTP message
-	template string
 }
 
-func New() *Service {
+func New(cfg Config, cache cache, smsProvider smsProvider) *Service {
 	return &Service{
-		domain:   "unknown",
-		template: "OTP is %s",
+		config:      cfg,
+		cache:       cache,
+		smsProvider: smsProvider,
 	}
 }
 
@@ -61,8 +77,8 @@ func (s *Service) Send(ctx context.Context, dto SendDto) error {
 	}
 
 	// - Cooldown? Skip
-	if s.isCooldown(ctx, phone.String()) {
-		return ErrCooldown
+	if err := s.allow(ctx, phone.String()); err != nil {
+		return err
 	}
 
 	// Increment the count.
@@ -76,9 +92,9 @@ func (s *Service) Send(ctx context.Context, dto SendDto) error {
 	// - count > 3? Set cooldown = 10m
 	// - set cooldown = 1m
 	{
-		key := s.cooldownKey(phone.String())
+		key := s.rateLimitKey(phone.String())
 		val := dto.ExternalID
-		ttl := cooldownDurationByCount(count)
+		ttl := RateLimitDurationByCount(count)
 		if err := s.cache.Set(ctx, key, val, ttl); err != nil {
 			return err
 		}
@@ -90,14 +106,14 @@ func (s *Service) Send(ctx context.Context, dto SendDto) error {
 	{
 		key := s.otpKey(phone.String(), otp)
 		val := dto.ExternalID
-		ttl := 3 * time.Minute
+		ttl := DefaultOtpTTL
 		if err := s.cache.Set(ctx, key, val, ttl); err != nil {
 			return err
 		}
 	}
 
 	// Send OTP
-	return s.smsProvider.Send(ctx, phone.String(), fmt.Sprintf(s.template, otp))
+	return s.smsProvider.Send(ctx, phone.String(), fmt.Sprintf(s.config.Template, s.config.App, otp))
 }
 
 type VerifyDto struct {
@@ -110,7 +126,11 @@ type VerifyDto struct {
 func (s *Service) Verify(ctx context.Context, dto VerifyDto) (string, error) {
 	phone := domain.PhoneNumber(dto.PhoneNumber)
 	if err := phone.Validate(); err != nil {
-		return "", fmt.Errorf("%w: %q", err, dto.PhoneNumber)
+		return "", err
+	}
+
+	if err := domain.OTP(dto.OTP).Validate(); err != nil {
+		return "", err
 	}
 
 	externalID, err := s.cache.Get(ctx, s.otpKey(phone.String(), dto.OTP))
@@ -125,27 +145,42 @@ func (s *Service) Verify(ctx context.Context, dto VerifyDto) (string, error) {
 		return "", err
 	}
 
-	if err := s.cache.Del(ctx, s.cooldownKey(phone.String())); err != nil {
+	if err := s.cache.Del(ctx, s.rateLimitKey(phone.String())); err != nil {
 		return "", err
 	}
 
 	return externalID, nil
 }
 
-func (s *Service) isCooldown(ctx context.Context, phoneNumber string) bool {
-	_, err := s.cache.Get(ctx, s.cooldownKey(phoneNumber))
-	return !errors.Is(err, ErrKeyNotFound)
+// TTL returns the remaining time before the user can make another request.
+// Used in conjunction with ErrOTPTooManyRequests.
+// Useful for UI to display.
+func (s *Service) TTL(ctx context.Context, phoneNumber string) (time.Duration, error) {
+	return s.cache.TTL(ctx, s.rateLimitKey(phoneNumber))
+}
+
+func (s *Service) allow(ctx context.Context, phoneNumber string) error {
+	_, err := s.cache.Get(ctx, s.rateLimitKey(phoneNumber))
+	if err != nil {
+		if errors.Is(err, ErrKeyNotFound) {
+			return nil
+		}
+
+		return err
+	}
+
+	return ErrOTPTooManyRequests
 }
 
 func (s *Service) otpKey(phoneNumber, otp string) string {
-	return fmt.Sprintf("otp:%s:pn:%s:otp:%s", s.domain, phoneNumber, otp)
+	return fmt.Sprintf(otpKey, s.config.Domain, phoneNumber, otp)
 }
 
-func (s *Service) cooldownKey(phoneNumber string) string {
-	return fmt.Sprintf("otp:%s:pn:%s:cooldown", s.domain, phoneNumber)
+func (s *Service) rateLimitKey(phoneNumber string) string {
+	return fmt.Sprintf(rateLimitKey, s.config.Domain, phoneNumber)
 }
 
-func cooldownDurationByCount(count int64) time.Duration {
+func RateLimitDurationByCount(count int64) time.Duration {
 	switch {
 	case count > 10:
 		return 24 * time.Hour
