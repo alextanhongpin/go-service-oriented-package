@@ -21,6 +21,7 @@ var (
 	// NOTE: The adapter is responsible for returning the correct error type.
 	// The service package should not depend on external dependencies.
 	ErrKeyNotFound        = errors.New("cache: key not found")
+	ErrExternalIDRequired = errors.New("external id required")
 	ErrOTPNotFound        = errors.New("otp: not found")
 	ErrOTPTooManyRequests = errors.New("otp: too many requests")
 )
@@ -70,13 +71,24 @@ type SendDto struct {
 	ExternalID  string // ExternalID to identify the request. You can for example hash the request.
 }
 
+func (dto SendDto) Validate() error {
+	if err := domain.PhoneNumber(dto.PhoneNumber).Validate(); err != nil {
+		return err
+	}
+	if dto.ExternalID == "" {
+		return ErrExternalIDRequired
+	}
+
+	return nil
+}
+
 func (s *Service) Send(ctx context.Context, dto SendDto) error {
-	phone := domain.PhoneNumber(dto.PhoneNumber)
-	if err := phone.Validate(); err != nil {
-		return fmt.Errorf("%w: %q", err, dto.PhoneNumber)
+	if err := domain.Validate(dto); err != nil {
+		return err
 	}
 
 	// - Cooldown? Skip
+	phone := domain.PhoneNumber(dto.PhoneNumber)
 	if err := s.allow(ctx, phone.String()); err != nil {
 		return err
 	}
@@ -121,18 +133,21 @@ type VerifyDto struct {
 	OTP         string
 }
 
+func (dto VerifyDto) Validate() error {
+	return domain.Validate(
+		domain.PhoneNumber(dto.PhoneNumber),
+		domain.OTP(dto.OTP),
+	)
+}
+
 // Verify verifies the phone number and OTP, and returns the associated
 // external id.
 func (s *Service) Verify(ctx context.Context, dto VerifyDto) (string, error) {
+	if err := domain.Validate(dto); err != nil {
+		return "", err
+	}
+
 	phone := domain.PhoneNumber(dto.PhoneNumber)
-	if err := phone.Validate(); err != nil {
-		return "", err
-	}
-
-	if err := domain.OTP(dto.OTP).Validate(); err != nil {
-		return "", err
-	}
-
 	externalID, err := s.cache.Get(ctx, s.otpKey(phone.String(), dto.OTP))
 	if errors.Is(err, ErrKeyNotFound) {
 		return "", ErrOTPNotFound

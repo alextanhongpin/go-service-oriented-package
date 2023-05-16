@@ -14,6 +14,58 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
+func TestSendDto(t *testing.T) {
+	testCases := []struct {
+		name    string
+		dtoFn   func(SendDto) SendDto
+		wantErr error
+	}{
+		{
+			name: "no phone number",
+			dtoFn: func(dto SendDto) SendDto {
+				dto.PhoneNumber = ""
+				return dto
+			},
+			wantErr: domain.ErrInvalidPhoneNumber,
+		},
+		{
+			name: "invalid phone number format",
+			dtoFn: func(dto SendDto) SendDto {
+				dto.PhoneNumber = "60123456789"
+				return dto
+			},
+			wantErr: domain.ErrInvalidPhoneNumber,
+		},
+		{
+			name: "no external id",
+			dtoFn: func(dto SendDto) SendDto {
+				dto.ExternalID = ""
+				return dto
+			},
+			wantErr: ErrExternalIDRequired,
+		},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+
+		// Arrange.
+		dto := tc.dtoFn(SendDto{
+			PhoneNumber: "+60123456789",
+			ExternalID:  "some-uuid",
+		})
+
+		t.Run(tc.name, func(t *testing.T) {
+			// Act.
+			svc := New(Config{}, nil, nil)
+			gotErr := svc.Send(context.Background(), dto)
+
+			// Assert.
+			assert.ErrorIs(t, gotErr, tc.wantErr)
+		})
+	}
+}
+
 func TestSend(t *testing.T) {
 	type stub struct {
 		getErr             error
@@ -28,28 +80,11 @@ func TestSend(t *testing.T) {
 
 	testCases := []struct {
 		name    string
-		argsFn  func(SendDto) SendDto
 		stubFn  func(*stub)
 		wantErr error
 	}{
 		{
 			name: "success",
-		},
-		{
-			name: "no phone number",
-			argsFn: func(dto SendDto) SendDto {
-				dto.PhoneNumber = ""
-				return dto
-			},
-			wantErr: domain.ErrInvalidPhoneNumber,
-		},
-		{
-			name: "invalid phone number format",
-			argsFn: func(dto SendDto) SendDto {
-				dto.PhoneNumber = "60123456789"
-				return dto
-			},
-			wantErr: domain.ErrInvalidPhoneNumber,
 		},
 		{
 			name: "rate limited",
@@ -99,14 +134,10 @@ func TestSend(t *testing.T) {
 		tc := tc
 
 		// Arrange.
-		args := SendDto{
+		dto := SendDto{
 			PhoneNumber: "+60123456789",
 			ExternalID:  "some-uuid",
 		}
-		if tc.argsFn != nil {
-			args = tc.argsFn(args)
-		}
-
 		stub := stub{
 			inc:    10,
 			getErr: ErrKeyNotFound,
@@ -115,8 +146,8 @@ func TestSend(t *testing.T) {
 			tc.stubFn(&stub)
 		}
 
-		otpKeyPrefix := fmt.Sprintf("otp:Payout:phone:%s:otp:", args.PhoneNumber)
-		rateLimitKey := fmt.Sprintf("otp:Payout:phone:%s:ratelimit", args.PhoneNumber)
+		otpKeyPrefix := fmt.Sprintf("otp:Payout:phone:%s:otp:", dto.PhoneNumber)
+		rateLimitKey := fmt.Sprintf("otp:Payout:phone:%s:ratelimit", dto.PhoneNumber)
 		ttl := RateLimitDurationByCount(stub.inc)
 
 		// Matchers.
@@ -129,17 +160,17 @@ func TestSend(t *testing.T) {
 			cache.On("Get", mock.Anything, rateLimitKey).
 				Return("", stub.getErr).Once()
 
-			cache.On("Inc", mock.Anything, args.ExternalID).
+			cache.On("Inc", mock.Anything, dto.ExternalID).
 				Return(stub.inc, stub.incErr).Once()
 
-			cache.On("Set", mock.Anything, rateLimitKey, args.ExternalID, ttl).
+			cache.On("Set", mock.Anything, rateLimitKey, dto.ExternalID, ttl).
 				Return(stub.setRateLimitKeyErr).Once()
 
-			cache.On("Set", mock.Anything, matchByOtpKeyPrefix, args.ExternalID, DefaultOtpTTL).
+			cache.On("Set", mock.Anything, matchByOtpKeyPrefix, dto.ExternalID, DefaultOtpTTL).
 				Return(stub.setOtpKeyErr).Once()
 
 			smsProvider := new(mocks.SmsProvider)
-			smsProvider.On("Send", mock.Anything, args.PhoneNumber, mock.Anything).
+			smsProvider.On("Send", mock.Anything, dto.PhoneNumber, mock.Anything).
 				Return(stub.sendErr).Once()
 
 			cfg := Config{
@@ -150,7 +181,7 @@ func TestSend(t *testing.T) {
 
 			// Act.
 			svc := New(cfg, cache, smsProvider)
-			gotErr := svc.Send(context.Background(), args)
+			gotErr := svc.Send(context.Background(), dto)
 
 			// Assert.
 			assert := assert.New(t)
@@ -158,6 +189,55 @@ func TestSend(t *testing.T) {
 		})
 	}
 
+}
+
+func TestVerifyDto(t *testing.T) {
+	testCases := []struct {
+		name    string
+		dtoFn   func(VerifyDto) VerifyDto
+		wantErr error
+	}{
+		{
+			name: "when no otp",
+			dtoFn: func(dto VerifyDto) VerifyDto {
+				dto.OTP = ""
+				return dto
+			},
+			wantErr: domain.ErrOTPInvalidFormat,
+		},
+		{
+			name: "when otp is not a number",
+			dtoFn: func(dto VerifyDto) VerifyDto {
+				dto.OTP = "xyzabc"
+				return dto
+			},
+			wantErr: domain.ErrOTPInvalidFormat,
+		},
+		{
+			name: "when phone number is invalid",
+			dtoFn: func(dto VerifyDto) VerifyDto {
+				dto.PhoneNumber = "0123456789"
+				return dto
+			},
+			wantErr: domain.ErrInvalidPhoneNumber,
+		},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+
+		// Arrange.
+		dto := tc.dtoFn(VerifyDto{
+			PhoneNumber: "+60123456789",
+			OTP:         "987654",
+		})
+
+		t.Run(tc.name, func(t *testing.T) {
+			svc := New(Config{}, nil, nil)
+			_, gotErr := svc.Verify(context.Background(), dto)
+			assert.ErrorIs(t, gotErr, tc.wantErr)
+		})
+	}
 }
 
 func TestVerify(t *testing.T) {
@@ -172,7 +252,6 @@ func TestVerify(t *testing.T) {
 
 	testCases := []struct {
 		name    string
-		argsFn  func(VerifyDto) VerifyDto
 		stubFn  func(*stub)
 		want    string
 		wantErr error
@@ -180,30 +259,6 @@ func TestVerify(t *testing.T) {
 		{
 			name: "success",
 			want: "some-uuid",
-		},
-		{
-			name: "when no otp",
-			argsFn: func(dto VerifyDto) VerifyDto {
-				dto.OTP = ""
-				return dto
-			},
-			wantErr: domain.ErrOTPInvalidFormat,
-		},
-		{
-			name: "when otp is not a number",
-			argsFn: func(dto VerifyDto) VerifyDto {
-				dto.OTP = "xyzabc"
-				return dto
-			},
-			wantErr: domain.ErrOTPInvalidFormat,
-		},
-		{
-			name: "when phone number is invalid",
-			argsFn: func(dto VerifyDto) VerifyDto {
-				dto.PhoneNumber = "0123456789"
-				return dto
-			},
-			wantErr: domain.ErrInvalidPhoneNumber,
 		},
 		{
 			name: "when get otp key failed",
@@ -239,12 +294,9 @@ func TestVerify(t *testing.T) {
 		tc := tc
 
 		// Arrange.
-		args := VerifyDto{
+		dto := VerifyDto{
 			PhoneNumber: "+60123456789",
 			OTP:         "987654",
-		}
-		if tc.argsFn != nil {
-			args = tc.argsFn(args)
 		}
 
 		stub := stub{
@@ -254,8 +306,8 @@ func TestVerify(t *testing.T) {
 			tc.stubFn(&stub)
 		}
 
-		otpKey := fmt.Sprintf("otp:Payout:phone:%s:otp:%s", args.PhoneNumber, args.OTP)
-		rateLimitKey := fmt.Sprintf("otp:Payout:phone:%s:ratelimit", args.PhoneNumber)
+		otpKey := fmt.Sprintf("otp:Payout:phone:%s:otp:%s", dto.PhoneNumber, dto.OTP)
+		rateLimitKey := fmt.Sprintf("otp:Payout:phone:%s:ratelimit", dto.PhoneNumber)
 
 		t.Run(tc.name, func(t *testing.T) {
 			cache := new(mocks.Cache)
@@ -277,7 +329,7 @@ func TestVerify(t *testing.T) {
 			}
 
 			svc := New(cfg, cache, smsProvider)
-			got, gotErr := svc.Verify(context.Background(), args)
+			got, gotErr := svc.Verify(context.Background(), dto)
 			assert := assert.New(t)
 			assert.Equal(tc.want, got)
 			assert.ErrorIs(gotErr, tc.wantErr)
