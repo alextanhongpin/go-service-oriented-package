@@ -33,40 +33,95 @@ The OTP Service sends an OTP to the phone number. The OTP must then be verified 
 
 **Actors:**
 - Client
-	- Web
+	- User: requests OTP
 - System
-	- OTP Service
-	- SMS Provider
+	- OTP Service: sends OTP
+	- SMS Provider: sends OTP through phone or Whatsapp
+	- Cache: caches OTP, rate-limit key
 
 **Basic flow:**
 
-1. Client sends OTP request to the System
-2. System validates the request
+1. Client requests OTP from the System
+2. System validates the [Phone Number](#value-object-phone-number) and [External ID](#value-object-external-id)
 	- [Rule: Phone Number](#rule-phone-number)
-3. System checks if the phone number is rate-limited
-4. System increments the request count
+3. System checks the Cache if the phone number is rate-limited
+4. System increments the request count in Cache
 	- [Rule: Rate-Limit Policy](#rule-rate-limit-policy)
-5. System updates rate-limit duration
-6. System generates new OTP
+5. System updates rate-limit duration in Cache
+6. System generates new [OTP](#value-object-otp)
 	- [Rule: OTP Code](#rule-otp-code)
-7. System stores the OTP for verification flow
+7. System stores the OTP and External ID in Cache for verification flow
 	- [Flow: Verify OTP](#flow-verify-otp)
 8. Systems calls SMS Provider to send the OTP to the client
 
 **Alternative flow:**
 
-- A2. Phone number invalid - return error message.
+- A2. Phone number invalid - return validation error message.
 - A3. Rate limited - return error message.
 - A7. Previous key-value exists - overwrite key-value.
 - A8. SMS Provider fails to send SMS - tell Client to try again.
 
 ---
 
+### Flow: Verify OTP
+
+The Verify OTP flow is responsible for verifying the generated OTP. OTP should be ephemeral - once it has been verified, the same OTP cannot be reused.
+
+This endpoint should also be rate-limited, to avoid DDOS attack. Some rate-limit strategy includes rate-limiting by phone and client IP as well. The endpoint should ideally require authorization (user must be logged in) too.
+
+**Actors:**
+- Client
+	- User: receives OTP from the [Flow: Send OTP](#flow-send-otp)
+- System
+	- OTP Service: validate the OTP
+	- Cache: caches the OTP and rate-limit
+
+
+**Basic flow:**
+
+1. Client submits the OTP
+2. System validates the request
+3. System checks if the OTP exists in Cache
+4. System deletes the OTP from Cache
+	- [Rule: OTP should not be reused](#rule-otp-should-not-be-reused)
+5. System deletes the rate-limit from Cache
+6. System returns the External ID
+
+**Alternative flow:**
+
+- A2. Validation errors - return validation error message
+- A3. OTP not found - return `ErrOtpNotFound`
+
+
+## Domain
+
+Domain includes entities and value objects. The difference between _domain_ and _business rules_ is that _domain_ is usually general, while _business rules_ is specific. Some examples below:
+
+| Domain                            | Business Rule                                               |
+| --                                | --                                                          |
+| Phone Number: format must be E164 | Supported country code is only for Malaysia and Singapore   |
+| OTP: must be at least 4 digits    | Use 6 digits for Payout OTP, use 4 digits for Auth OTP      |
+
+
+### Value Object: Phone Number
+
+Phone number must be in E164 format.
+
+### Value Object: External ID
+
+The **External ID** provided to guard against concurrent requests. A user can request OTP multiple times, and each OTP must be tied to that particular request. If the user requested the OTP 3 times, the first 2 OTP that they received should be deemed invalid.
+
+### Value Object: OTP
+
+OTP must be string digits, since an OTP can start with 0.
+
 ## Business Rules
 
 ### Rule: Phone Number
 
-Phone number must be in E164 format. Return `ErrInvalidPhoneNumberFormat` if the format is not E164.
+- If format is invalid, return `ErrInvalidPhoneNumberFormat`
+- Supported country code: Malaysia (`+60`) and Singapore (`+65`)
+
 
 ### Rule: Rate-Limit Policy
 
@@ -99,3 +154,7 @@ OTP must be at least a 4-digit number. Some ways to generate includes TOTP, HOTP
 # Good
 + 542380
 ```
+
+### Rule: OTP Should Not Be Reused
+
+Once the OTP is verified, the OTP should be deleted and not reused.
