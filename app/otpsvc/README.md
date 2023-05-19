@@ -111,6 +111,22 @@ Phone number must be in E164 format.
 
 The **External ID** provided to guard against concurrent requests. A user can request OTP multiple times, and each OTP must be tied to that particular request. If the user requested the OTP 3 times, the first 2 OTP that they received should be deemed invalid.
 
+
+Why is this important? Because not all requests are deemed equal. For example:
+
+```markdown
+1. User request first OTP for withdrawing MYR 1000
+2. First OTP arrived, but wasn't used
+3. User request second OTP for withdrawing MYR 900
+4. Second OTP arrived
+5. User used first OTP
+6. Successfully withdrawn MYR 900 (ideal scenario: the first OTP should be invalid)
+```
+
+
+The External ID provided should point to the immutable request, e.g. the MD5 hash of the request of just a cache key that points to the request. That way, if the [Flow: Verify OTP](#flow-verify-otp) is successful, the `External ID` returned can be used to check if the request has been tampered.
+
+
 ### Value Object: OTP
 
 OTP must be string digits, since an OTP can start with 0.
