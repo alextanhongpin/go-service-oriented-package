@@ -157,21 +157,12 @@ func TestSend(t *testing.T) {
 
 		t.Run(tc.name, func(t *testing.T) {
 			cache := new(mocks.Cache)
-			cache.On("Get", mock.Anything, rateLimitKey).
-				Return("", stub.getErr).Once()
-
-			cache.On("Inc", mock.Anything, dto.ExternalID).
-				Return(stub.inc, stub.incErr).Once()
-
-			cache.On("Set", mock.Anything, rateLimitKey, dto.ExternalID, ttl).
-				Return(stub.setRateLimitKeyErr).Once()
-
-			cache.On("Set", mock.Anything, matchByOtpKeyPrefix, dto.ExternalID, DefaultOtpTTL).
-				Return(stub.setOtpKeyErr).Once()
-
+			cache.On("Get", mock.Anything, rateLimitKey).Return("", stub.getErr).Once()
+			cache.On("Inc", mock.Anything, dto.ExternalID).Return(stub.inc, stub.incErr).Once()
+			cache.On("Set", mock.Anything, rateLimitKey, dto.ExternalID, ttl).Return(stub.setRateLimitKeyErr).Once()
+			cache.On("Set", mock.Anything, matchByOtpKeyPrefix, dto.ExternalID, DefaultOtpTTL).Return(stub.setOtpKeyErr).Once()
 			smsProvider := new(mocks.SmsProvider)
-			smsProvider.On("Send", mock.Anything, dto.PhoneNumber, mock.Anything).
-				Return(stub.sendErr).Once()
+			smsProvider.On("Send", mock.Anything, dto.PhoneNumber, mock.Anything).Return(stub.sendErr).Once()
 
 			cfg := Config{
 				App:      "MyApp",
@@ -311,14 +302,9 @@ func TestVerify(t *testing.T) {
 
 		t.Run(tc.name, func(t *testing.T) {
 			cache := new(mocks.Cache)
-			cache.On("Get", mock.Anything, otpKey).
-				Return(stub.get, stub.getErr).Once()
-
-			cache.On("Del", mock.Anything, otpKey).
-				Return(stub.delOtpKeyErr).Once()
-
-			cache.On("Del", mock.Anything, rateLimitKey).
-				Return(stub.delRateLimitKeyErr).Once()
+			cache.On("Get", mock.Anything, otpKey).Return(stub.get, stub.getErr).Once()
+			cache.On("Del", mock.Anything, otpKey).Return(stub.delOtpKeyErr).Once()
+			cache.On("Del", mock.Anything, rateLimitKey).Return(stub.delRateLimitKeyErr).Once()
 
 			smsProvider := new(mocks.SmsProvider)
 
