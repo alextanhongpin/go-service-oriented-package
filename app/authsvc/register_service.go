@@ -22,12 +22,12 @@ type CreateUserParams[T any] struct {
 	Data              T
 }
 
-type registerRepo[T any] interface {
-	Create(ctx context.Context, params CreateUserParams[T]) error
+type registerRepo[T, V any] interface {
+	Create(ctx context.Context, params CreateUserParams[T]) (*V, error)
 }
 
-type RegisterService[T any] struct {
-	repo registerRepo[T]
+type RegisterService[T, V any] struct {
+	repo registerRepo[T, V]
 }
 
 type RegisterDto[T any] struct {
@@ -48,26 +48,26 @@ func (dto RegisterDto[T]) Validate() error {
 	)
 }
 
-func (s *RegisterService[T]) Register(ctx context.Context, dto RegisterDto[T]) error {
+func (s *RegisterService[T, V]) Register(ctx context.Context, dto RegisterDto[T]) (*V, error) {
 	if err := domain.Validate(dto); err != nil {
-		return err
+		return nil, err
 	}
 
 	pwd := password.Plaintext(dto.Password)
 	ciphertext, err := pwd.Encrypt()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	err = s.repo.Create(ctx, CreateUserParams[T]{
+	v, err := s.repo.Create(ctx, CreateUserParams[T]{
 		Name:              dto.Name,
 		Email:             dto.Email,
 		EncryptedPassword: string(ciphertext),
 		Data:              dto.Data,
 	})
 	if errors.Is(err, ErrEmailExists) {
-		return ErrEmailExists
+		return nil, ErrEmailExists
 	}
 
-	return err
+	return v, err
 }
