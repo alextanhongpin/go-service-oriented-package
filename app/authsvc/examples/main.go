@@ -17,45 +17,43 @@ type User struct {
 	Email string
 }
 
-type AuthUsecase struct {
-	// Method steps
-	loginSteps interface {
+type LoginUsecase struct {
+	steps interface {
 		Login(ctx context.Context, dto authsvc.LoginDto) (*User, error)
 		GenerateToken(ctx context.Context, user *User) (string, error)
 	}
-	// anotherMethodSteps ..
 }
 
-type loginSteps struct {
+type steps struct {
 	*authsvc.LoginService[User]
 	*generateTokenStep
 }
 
 type LoginDto = authsvc.LoginDto
 
-func (uc *AuthUsecase) Login(ctx context.Context, dto LoginDto) (string, error) {
+func (uc *LoginUsecase) Login(ctx context.Context, dto LoginDto) (string, error) {
 	defer func(start time.Time) {
 		log.Println("took: ", time.Since(start))
 	}(time.Now())
 
 	// Add other steps, like monitoring etc.
-	user, err := uc.loginSteps.Login(ctx, dto)
+	user, err := uc.steps.Login(ctx, dto)
 	if err != nil {
 		return "", err
 	}
 
-	return uc.loginSteps.GenerateToken(ctx, user)
+	return uc.steps.GenerateToken(ctx, user)
 }
 
 func main() {
 	svc := authsvc.NewLoginService[User](&repository{})
 	ctx := context.Background()
 
-	uc := &AuthUsecase{loginSteps: &loginSteps{
+	uc := &LoginUsecase{steps: &steps{
 		LoginService:      svc,
 		generateTokenStep: &generateTokenStep{},
 	}}
-	user, err := uc.Login(ctx, LoginDto{
+	token, err := uc.Login(ctx, LoginDto{
 		Email:    "john.doe@mail.com",
 		Password: "12345678",
 	})
@@ -63,7 +61,7 @@ func main() {
 		panic(err)
 	}
 
-	fmt.Println(user)
+	fmt.Println("token:", token)
 }
 
 type repository struct{}
