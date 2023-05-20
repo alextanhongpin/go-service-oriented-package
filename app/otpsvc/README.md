@@ -1,28 +1,135 @@
 # OTP Service
 
-The OTP Service is responsible for sending and verifying user OTP.
+The OTP Service is a Usecase-as-a-Service for sending and verifying user OTP.
+
+
+## How to Use
+
+1. Implement the `cache` interface.
+2. Implement the `smsProvider` interface.
+3. Init the service with the config and the dependencies.
+
+See [./service_test.go](./service_test.go) for usage.
 
 ## Usecases
 
+The example usecase below is sending out OTP when requesting Payout.
+
+```markdown
+As a User,
+I want to request Payout,
+In order to withdraw money from my Wallet to my Bank Account
+```
+
+### Scenario: Happy Path
+
+Consists of two main flow
+1. request OTP
+2. verify OTP
+
+User will request for an operation that requires OTP verification. An example would be Payout, where User wants to withdraw money from the Wallet to the Bank Account.
 
 ```mermaid
 ---
-title: OTP Usecases
+title: Payout Send OTP Flow - Happy Path
 ---
-flowchart LR
-	u[User]
+sequenceDiagram
+	autonumber
 
-	subgraph OTP Service
-		uc0[Send OTP]
-		uc1[Verify OTP]
-	end
+	actor p0 as User
+	participant svc0 as Payout Service
+	participant svc1 as OTP Service
 
-	u --> uc0 & uc1
+
+	p0 ->>+ svc0: make PayoutRequest
+	svc0 ->> svc0: generate external id
+	svc0 ->> svc0: cache PayoutRequest
+	svc0 ->>+ svc1: call SendOTP()
+	svc1 -->>- svc0: ok
+	svc0 -->>- p0: 202 - Accepted
+
+	svc1 -->> p0: send OTP
 ```
 
+User submits the OTP for verification, and if successful, will receive the Payout.
+
+```mermaid
+---
+title: Payout Verify OTP Flow - Happy Path
+---
+sequenceDiagram
+	autonumber
+
+	actor p0 as User
+	participant svc0 as Payout Service
+	participant svc1 as OTP Service
+
+	p0 ->>+ svc0: send OTP
+
+	svc0 ->>+ svc1: call VerifyOTP(otp)
+	svc1 -->>- svc0: ok {"external_id": "..."}
+	svc0 ->> svc0: get Payout Request by external id
+	svc0 ->> svc0: disburse Payout
+	svc0 -->>- p0: 200 - OK
+```
+
+### Scenario: Too Many Requests
+
+To avoid DDOS, the service should be rate-limited.
+
+```mermaid
+---
+title: Payout Send OTP Flow - Too Many Requests
+---
+sequenceDiagram
+	autonumber
+
+	actor p0 as User
+	participant svc0 as Payout Service
+	participant svc1 as OTP Service
 
 
-## Flows
+	p0 ->> svc0: make PayoutRequest
+	p0 ->> svc0: make PayoutRequest
+	p0 ->> svc0: make PayoutRequest
+	p0 ->>+ svc0: make PayoutRequest
+	svc0 -->>- p0: 422 - Too Many Requests
+```
+
+### Scenario: OTP Sequence
+
+In this scenario, User makes multiple OTP requests to the System and receives multiple OTP in return.
+
+However, only _the most recent_ OTP will be valid, since the previous OTPs should be invalidated upon new request.
+
+```mermaid
+---
+title: Payout Send OTP Flow - Too Many Requests
+---
+sequenceDiagram
+	autonumber
+
+	actor p0 as User
+	participant svc0 as Payout Service
+	participant svc1 as OTP Service
+
+	svc1 -->> p0: OTP 1
+	svc1 -->> p0: OTP 2
+	svc1 -->> p0: OTP 3
+
+	p0 ->>+ svc0: verify OTP 1
+	svc0 -->>- p0: 404 - Not Found
+
+	p0 ->>+ svc0: verify OTP 2
+	svc0 -->>- p0: 404 - Not Found
+
+	p0 ->>+ svc0: verify OTP 3
+	svc0 -->>- p0: 200 - OK
+```
+
+## System Flow
+
+System flow describes the internal service interaction. Usecase flows only covers the interaction between the participants and the actor.
 
 
 ### Flow: Send OTP
@@ -126,6 +233,7 @@ Why is this important? Because not all requests are deemed equal. For example:
 
 The External ID provided should point to the immutable request, e.g. the MD5 hash of the request of just a cache key that points to the request. That way, if the [Flow: Verify OTP](#flow-verify-otp) is successful, the `External ID` returned can be used to check if the request has been tampered.
 
+See also [Scenario: OTP Sequence](#scenario-otp-sequence).
 
 ### Value Object: OTP
 
