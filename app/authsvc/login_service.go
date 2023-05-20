@@ -26,6 +26,12 @@ type LoginService[T any] struct {
 	repo loginRepository[T]
 }
 
+func NewLoginService[T any](repo loginRepository[T]) *LoginService[T] {
+	return &LoginService[T]{
+		repo: repo,
+	}
+}
+
 type LoginDto struct {
 	Email    string
 	Password string
