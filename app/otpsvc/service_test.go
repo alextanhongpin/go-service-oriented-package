@@ -157,13 +157,14 @@ func TestSend(t *testing.T) {
 		})
 
 		t.Run(tc.name, func(t *testing.T) {
-			cache := new(mocks.Cache)
-			cache.On("Get", mock.Anything, rateLimitKey).Return("", stub.getErr).Once()
-			cache.On("Inc", mock.Anything, dto.ExternalID).Return(stub.inc, stub.incErr).Once()
-			cache.On("Set", mock.Anything, rateLimitKey, dto.ExternalID, ttl).Return(stub.setRateLimitKeyErr).Once()
-			cache.On("Set", mock.Anything, matchByOtpKeyPrefix, dto.ExternalID, DefaultOtpTTL).Return(stub.setOtpKeyErr).Once()
-			smsProvider := new(mocks.SmsProvider)
-			smsProvider.On("Send", mock.Anything, dto.PhoneNumber, mock.Anything).Return(stub.sendErr).Once()
+			cache := mocks.NewCache(t)
+			cache.On("Get", mock.Anything, rateLimitKey).Return("", stub.getErr)
+			cache.On("Inc", mock.Anything, dto.ExternalID).Return(stub.inc, stub.incErr).Maybe()
+			cache.On("Set", mock.Anything, rateLimitKey, dto.ExternalID, ttl).Return(stub.setRateLimitKeyErr).Maybe()
+			cache.On("Set", mock.Anything, matchByOtpKeyPrefix, dto.ExternalID, DefaultOtpTTL).Return(stub.setOtpKeyErr).Maybe()
+
+			smsProvider := mocks.NewSmsProvider(t)
+			smsProvider.On("Send", mock.Anything, dto.PhoneNumber, mock.Anything).Return(stub.sendErr).Maybe()
 
 			cfg := Config{
 				App:      "MyApp",
@@ -302,12 +303,12 @@ func TestVerify(t *testing.T) {
 		rateLimitKey := fmt.Sprintf("otp:Payout:phone:%s:ratelimit", dto.PhoneNumber)
 
 		t.Run(tc.name, func(t *testing.T) {
-			cache := new(mocks.Cache)
+			cache := mocks.NewCache(t)
 			cache.On("Get", mock.Anything, otpKey).Return(stub.get, stub.getErr).Once()
-			cache.On("Del", mock.Anything, otpKey).Return(stub.delOtpKeyErr).Once()
-			cache.On("Del", mock.Anything, rateLimitKey).Return(stub.delRateLimitKeyErr).Once()
+			cache.On("Del", mock.Anything, otpKey).Return(stub.delOtpKeyErr).Maybe()
+			cache.On("Del", mock.Anything, rateLimitKey).Return(stub.delRateLimitKeyErr).Maybe()
 
-			smsProvider := new(mocks.SmsProvider)
+			smsProvider := mocks.NewSmsProvider(t)
 
 			cfg := Config{
 				App:      "MyApp",
@@ -363,9 +364,9 @@ func TestTTL(t *testing.T) {
 		}
 
 		t.Run(tc.name, func(t *testing.T) {
-			cache := new(mocks.Cache)
+			cache := mocks.NewCache(t)
 			cache.On("TTL", mock.Anything, "otp:Payout:phone:+60123456789:ratelimit").Return(stub.ttl, stub.ttlErr).Once()
-			smsProvider := new(mocks.SmsProvider)
+			smsProvider := mocks.NewSmsProvider(t)
 
 			cfg := Config{
 				App:      "MyApp",
@@ -383,7 +384,6 @@ func TestTTL(t *testing.T) {
 }
 
 func TestRateLimitDurationByCount(t *testing.T) {
-
 	testCases := []struct {
 		name  string
 		count int64
