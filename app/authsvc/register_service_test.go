@@ -74,11 +74,18 @@ func TestRegisterService(t *testing.T) {
 			tc.stubFn(&stub)
 		}
 
-		matchCreateParams := mock.MatchedBy(func(dto authsvc.CreateUserParams[TWant]) bool {
-			return true
-		})
-
 		t.Run(tc.name, func(t *testing.T) {
+			assert := assert.New(t)
+
+			matchCreateParams := mock.MatchedBy(func(dto authsvc.CreateUserParams[TWant]) bool {
+				assert.Equal(args.Data, dto.Data)
+				assert.Equal(args.Name, dto.Name)
+				assert.Equal(args.Email, dto.Email)
+				assert.NotEqual(args.Password, dto.EncryptedPassword, "password must be encrypted")
+
+				return true
+			})
+
 			repo := mocks.NewRegisterRepo[TWant, VWant](t)
 			repo.On("Create", mock.Anything, matchCreateParams).Return(stub.create, stub.createErr).Once()
 
@@ -87,7 +94,6 @@ func TestRegisterService(t *testing.T) {
 			svc := authsvc.NewRegisterService[TWant, VWant](repo)
 			got, err := svc.Register(ctx, args)
 
-			assert := assert.New(t)
 			assert.Equal(tc.want, got)
 			assert.ErrorIs(err, tc.wantErr, err)
 		})
