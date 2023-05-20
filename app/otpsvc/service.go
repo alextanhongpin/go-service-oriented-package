@@ -22,8 +22,8 @@ var (
 	// The service package should not depend on external dependencies.
 	ErrKeyNotFound        = errors.New("cache: key not found")
 	ErrExternalIDRequired = errors.New("external id required")
-	ErrOTPNotFound        = errors.New("otp: not found")
-	ErrOTPTooManyRequests = errors.New("otp: too many requests")
+	ErrOtpNotFound        = errors.New("otp: not found")
+	ErrOtpTooManyRequests = errors.New("otp: too many requests")
 )
 
 //go:generate mockery --name smsProvider --case underscore --exported=true
@@ -150,7 +150,7 @@ func (s *Service) Verify(ctx context.Context, dto VerifyDto) (string, error) {
 	phone := domain.PhoneNumber(dto.PhoneNumber)
 	externalID, err := s.cache.Get(ctx, s.otpKey(phone.String(), dto.OTP))
 	if errors.Is(err, ErrKeyNotFound) {
-		return "", ErrOTPNotFound
+		return "", ErrOtpNotFound
 	}
 	if err != nil {
 		return "", err
@@ -168,7 +168,7 @@ func (s *Service) Verify(ctx context.Context, dto VerifyDto) (string, error) {
 }
 
 // TTL returns the remaining time before the user can make another request.
-// Used in conjunction with ErrOTPTooManyRequests.
+// Used in conjunction with ErrOtpTooManyRequests.
 // Useful for UI to display.
 func (s *Service) TTL(ctx context.Context, phoneNumber string) (time.Duration, error) {
 	return s.cache.TTL(ctx, s.rateLimitKey(phoneNumber))
@@ -184,7 +184,7 @@ func (s *Service) allow(ctx context.Context, phoneNumber string) error {
 		return err
 	}
 
-	return ErrOTPTooManyRequests
+	return ErrOtpTooManyRequests
 }
 
 func (s *Service) otpKey(phoneNumber, otp string) string {

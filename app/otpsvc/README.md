@@ -27,7 +27,12 @@ Consists of two main flow
 1. request OTP
 2. verify OTP
 
-User will request for an operation that requires OTP verification. An example would be Payout, where User wants to withdraw money from the Wallet to the Bank Account.
+
+```markdown
+Given that the User request Payout from the System,
+When the request is valid,
+Then the System will send an OTP to the User.
+```
 
 ```mermaid
 ---
@@ -51,7 +56,11 @@ sequenceDiagram
 	svc1 -->> p0: send OTP
 ```
 
-User submits the OTP for verification, and if successful, will receive the Payout.
+```markdown
+Given that the User submits an OTP for Payout,
+When the OTP is valid,
+Then the Payout will be disbursed.
+```
 
 ```mermaid
 ---
@@ -75,7 +84,13 @@ sequenceDiagram
 
 ### Scenario: Too Many Requests
 
-To avoid DDOS, the service should be rate-limited.
+To avoid DDOS, the service should be rate-limited. Below, user makes multiple requests, and will eventually be rate-limited.
+
+```markdown
+Given that the User requests multiple OTPs,
+When the send threshold is exceeded,
+Then the next request will result in error Too Many Requests.
+```
 
 ```mermaid
 ---
@@ -88,23 +103,26 @@ sequenceDiagram
 	participant svc0 as Payout Service
 	participant svc1 as OTP Service
 
-
-	p0 ->> svc0: make PayoutRequest
-	p0 ->> svc0: make PayoutRequest
-	p0 ->> svc0: make PayoutRequest
+	p0 -) svc0: make PayoutRequest
+	p0 -) svc0: make PayoutRequest
+	p0 -) svc0: make PayoutRequest
 	p0 ->>+ svc0: make PayoutRequest
+	svc0 ->>+ svc1: call SendOTP()
+	svc1 -->>- svc0: ErrOtpTooManyRequests
 	svc0 -->>- p0: 422 - Too Many Requests
 ```
 
 ### Scenario: OTP Sequence
 
-In this scenario, User makes multiple OTP requests to the System and receives multiple OTP in return.
-
-However, only _the most recent_ OTP will be valid, since the previous OTPs should be invalidated upon new request.
+```markdown
+Given that the User requests multiple OTPs,
+When submitting OTP for verification,
+Then only the last OTP will be valid.
+```
 
 ```mermaid
 ---
-title: Payout Send OTP Flow - Too Many Requests
+title: Payout Send OTP Flow - OTP Sequence
 ---
 sequenceDiagram
 	autonumber
@@ -118,13 +136,51 @@ sequenceDiagram
 	svc1 -->> p0: OTP 3
 
 	p0 ->>+ svc0: verify OTP 1
+	svc0 ->>+ svc1: call VerifyOTP()
+	svc1 -->>- svc0: ErrOtpNotFound
 	svc0 -->>- p0: 404 - Not Found
 
 	p0 ->>+ svc0: verify OTP 2
+	svc0 ->>+ svc1: call VerifyOTP()
+	svc1 -->>- svc0: ErrOtpNotFound
 	svc0 -->>- p0: 404 - Not Found
 
 	p0 ->>+ svc0: verify OTP 3
+	svc0 ->>+ svc1: call VerifyOTP()
+	svc1 -->>- svc0: ok
 	svc0 -->>- p0: 200 - OK
+```
+
+### Scenario: OTP Reuse
+
+```markdown
+Given that User successfully verified the OTP,
+When the User submits the same OTP again,
+Then the System should return error.
+```
+
+```mermaid
+---
+title: Payout Send OTP Flow - OTP Reuse
+---
+sequenceDiagram
+	autonumber
+
+	actor p0 as User
+	participant svc0 as Payout Service
+	participant svc1 as OTP Service
+
+	svc1 -->> p0: OTP
+
+	p0 ->>+ svc0: verify OTP
+	svc0 ->>+ svc1: call VerifyOTP()
+	svc1 -->>- svc0: ok
+	svc0 -->>- p0: 200 - OK
+
+	p0 ->>+ svc0: verify OTP
+	svc0 ->>+ svc1: call VerifyOTP()
+	svc1 -->>- svc0: ErrOtpNotFound
+	svc0 -->>- p0: 404 - Not Found
 ```
 
 ## System Flow
