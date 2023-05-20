@@ -1,4 +1,4 @@
-package domain
+package phones
 
 import (
 	"errors"
@@ -14,7 +14,7 @@ var (
 	ErrInvalidPhoneNumberFormat = errors.New("phone: invalid phone number format")
 )
 
-func NewPhoneNumber(maybePhoneNumber, region string) (PhoneNumber, error) {
+func New(maybePhoneNumber, region string) (PhoneNumber, error) {
 	phone, err := phonenumbers.Parse(maybePhoneNumber, region)
 	if err != nil {
 		return "", err

@@ -10,6 +10,7 @@ import (
 
 	"github.com/alextanhongpin/go-service-oriented-package/app/otpsvc/mocks"
 	"github.com/alextanhongpin/go-service-oriented-package/domain"
+	"github.com/alextanhongpin/go-service-oriented-package/domain/phones"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -26,7 +27,7 @@ func TestSendDto(t *testing.T) {
 				dto.PhoneNumber = ""
 				return dto
 			},
-			wantErr: domain.ErrInvalidPhoneNumber,
+			wantErr: phones.ErrInvalidPhoneNumber,
 		},
 		{
 			name: "invalid phone number format",
@@ -34,7 +35,7 @@ func TestSendDto(t *testing.T) {
 				dto.PhoneNumber = "60123456789"
 				return dto
 			},
-			wantErr: domain.ErrInvalidPhoneNumber,
+			wantErr: phones.ErrInvalidPhoneNumber,
 		},
 		{
 			name: "no external id",
@@ -91,7 +92,7 @@ func TestSend(t *testing.T) {
 			stubFn: func(stub *stub) {
 				stub.getErr = nil
 			},
-			wantErr: ErrOTPTooManyRequests,
+			wantErr: ErrOtpTooManyRequests,
 		},
 		{
 			name: "get error",
@@ -210,7 +211,7 @@ func TestVerifyDto(t *testing.T) {
 				dto.PhoneNumber = "0123456789"
 				return dto
 			},
-			wantErr: domain.ErrInvalidPhoneNumber,
+			wantErr: phones.ErrInvalidPhoneNumber,
 		},
 	}
 
@@ -263,7 +264,7 @@ func TestVerify(t *testing.T) {
 			stubFn: func(stub *stub) {
 				stub.getErr = ErrKeyNotFound
 			},
-			wantErr: ErrOTPNotFound,
+			wantErr: ErrOtpNotFound,
 		},
 		{
 			name: "when get del otp key failed",

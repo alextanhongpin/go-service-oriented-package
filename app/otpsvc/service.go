@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/alextanhongpin/go-service-oriented-package/domain"
+	"github.com/alextanhongpin/go-service-oriented-package/domain/phones"
 )
 
 const otpKey = "otp:%s:phone:%s:otp:%s"
@@ -72,7 +73,7 @@ type SendDto struct {
 }
 
 func (dto SendDto) Validate() error {
-	if err := domain.PhoneNumber(dto.PhoneNumber).Validate(); err != nil {
+	if err := phones.PhoneNumber(dto.PhoneNumber).Validate(); err != nil {
 		return err
 	}
 	if dto.ExternalID == "" {
@@ -88,7 +89,7 @@ func (s *Service) Send(ctx context.Context, dto SendDto) error {
 	}
 
 	// - Cooldown? Skip
-	phone := domain.PhoneNumber(dto.PhoneNumber)
+	phone := phones.PhoneNumber(dto.PhoneNumber)
 	if err := s.allow(ctx, phone.String()); err != nil {
 		return err
 	}
@@ -135,7 +136,7 @@ type VerifyDto struct {
 
 func (dto VerifyDto) Validate() error {
 	return domain.Validate(
-		domain.PhoneNumber(dto.PhoneNumber),
+		phones.PhoneNumber(dto.PhoneNumber),
 		domain.OTP(dto.OTP),
 	)
 }
@@ -147,7 +148,7 @@ func (s *Service) Verify(ctx context.Context, dto VerifyDto) (string, error) {
 		return "", err
 	}
 
-	phone := domain.PhoneNumber(dto.PhoneNumber)
+	phone := phones.PhoneNumber(dto.PhoneNumber)
 	externalID, err := s.cache.Get(ctx, s.otpKey(phone.String(), dto.OTP))
 	if errors.Is(err, ErrKeyNotFound) {
 		return "", ErrOtpNotFound
