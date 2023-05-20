@@ -18,15 +18,16 @@ type User[T any] struct {
 	Data              *T
 }
 
-type loginRepository[T any] interface {
+//go:generate mockery --name loginRepo --case underscore --exported=true
+type loginRepo[T any] interface {
 	FindUserByEmail(ctx context.Context, email string) (*User[T], error)
 }
 
 type LoginService[T any] struct {
-	repo loginRepository[T]
+	repo loginRepo[T]
 }
 
-func NewLoginService[T any](repo loginRepository[T]) *LoginService[T] {
+func NewLoginService[T any](repo loginRepo[T]) *LoginService[T] {
 	return &LoginService[T]{
 		repo: repo,
 	}

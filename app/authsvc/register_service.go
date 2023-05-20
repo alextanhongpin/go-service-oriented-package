@@ -22,12 +22,19 @@ type CreateUserParams[T any] struct {
 	Data              T
 }
 
+//go:generate mockery --name registerRepo --case underscore --exported=true
 type registerRepo[T, V any] interface {
 	Create(ctx context.Context, params CreateUserParams[T]) (*V, error)
 }
 
 type RegisterService[T, V any] struct {
 	repo registerRepo[T, V]
+}
+
+func NewRegisterService[T, V any](repo registerRepo[T, V]) *RegisterService[T, V] {
+	return &RegisterService[T, V]{
+		repo: repo,
+	}
 }
 
 type RegisterDto[T any] struct {
