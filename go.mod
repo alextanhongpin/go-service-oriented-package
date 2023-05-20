@@ -4,6 +4,7 @@ go 1.20
 
 require (
 	github.com/alextanhongpin/passwd v0.2.0
+	github.com/google/uuid v1.3.0
 	github.com/nyaruka/phonenumbers v1.1.7
 	github.com/stretchr/testify v1.8.2
 )
