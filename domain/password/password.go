@@ -2,16 +2,21 @@ package password
 
 import (
 	"errors"
+	"unicode/utf8"
 
 	"github.com/alextanhongpin/passwd"
 )
 
 // PasswordMinLen rules
-const PasswordMinLen = 8
+const (
+	PasswordMinLen = 8
+	PasswordMaxLen = 128 // Max length of argon2 (?)
+)
 
 // Password errors.
 var (
 	ErrPasswordTooShort = errors.New("password: too short")
+	ErrPasswordTooLong  = errors.New("password: too long")
 )
 
 // Plaintext representation of password.
@@ -19,8 +24,13 @@ type Plaintext string
 
 // Validate validates the plaintext min length.
 func (p Plaintext) Validate() error {
-	if len(string(p)) < PasswordMinLen {
+	n := utf8.RuneCountInString(string(p))
+	if n < PasswordMinLen {
 		return ErrPasswordTooShort
+	}
+
+	if n > PasswordMaxLen {
+		return ErrPasswordTooLong
 	}
 
 	return nil
