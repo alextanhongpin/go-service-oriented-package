@@ -14,11 +14,11 @@ import (
 
 func TestSendOtp(t *testing.T) {
 	type stub struct {
-		allowErr       error
-		generateOtp    domain.OTP
-		generateOtpErr error
-		cacheOtpErr    error
-		sendMessageErr error
+		allowErr         error
+		generateOtp      domain.OTP
+		generateOtpErr   error
+		createSessionErr error
+		sendMessageErr   error
 	}
 
 	wantErr := errors.New("want")
@@ -48,9 +48,9 @@ func TestSendOtp(t *testing.T) {
 			wantErr: wantErr,
 		},
 		{
-			name: "cache otp error",
+			name: "create session error",
 			stubFn: func(stub *stub) {
-				stub.cacheOtpErr = wantErr
+				stub.createSessionErr = wantErr
 			},
 			wantErr: wantErr,
 		},
@@ -80,7 +80,7 @@ func TestSendOtp(t *testing.T) {
 			steps := mocks.NewSendOtp(t)
 			steps.On("Allow", mock.Anything, args).Return(stub.allowErr).Maybe()
 			steps.On("GenerateOtp", mock.Anything).Return(stub.generateOtp, stub.generateOtpErr).Maybe()
-			steps.On("CacheOtp", mock.Anything, args, stub.generateOtp).Return(stub.cacheOtpErr).Maybe()
+			steps.On("CreateSession", mock.Anything, args, stub.generateOtp).Return(stub.createSessionErr).Maybe()
 			steps.On("SendMessage", mock.Anything, args, stub.generateOtp).Return(stub.sendMessageErr).Maybe()
 
 			ctx := context.Background()

@@ -30,8 +30,8 @@ func (_m *SendOtp) Allow(ctx context.Context, dto otp.SendOtpDto) error {
 	return r0
 }
 
-// CacheOtp provides a mock function with given fields: ctx, dto, _a2
-func (_m *SendOtp) CacheOtp(ctx context.Context, dto otp.SendOtpDto, _a2 domain.OTP) error {
+// CreateSession provides a mock function with given fields: ctx, dto, _a2
+func (_m *SendOtp) CreateSession(ctx context.Context, dto otp.SendOtpDto, _a2 domain.OTP) error {
 	ret := _m.Called(ctx, dto, _a2)
 
 	var r0 error
