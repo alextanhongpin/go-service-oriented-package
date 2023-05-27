@@ -11,3 +11,13 @@ Some design considerations
 - the services does not implement transactions - it is up to the caller to implement it externally
 - the services are meant to be as generic as possible, it does not cater specific usecases
 - the service does not return events etc, it is up to the caller to handle it themselves
+
+
+## Steps instead of dependencies
+
+
+## Steps guide
+
+- use command verb
+- hint at dependencies, e.g. saveX, queueX, notifyX, emailX
+- allow decision making, whenCondition
