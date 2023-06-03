@@ -5,17 +5,15 @@ import (
 	"errors"
 
 	"github.com/alextanhongpin/go-service-oriented-package/domain"
-	"github.com/alextanhongpin/go-service-oriented-package/domain/emails"
-	"github.com/alextanhongpin/go-service-oriented-package/domain/password"
 )
 
 // A continuation of the request reset password for non-logged in user.
 type resetPassword interface {
 	// 1. Verify the jwt token provided. It should have the email as the subject.
-	VerifyToken(ctx context.Context, token string) (emails.Email, error)
+	VerifyToken(ctx context.Context, token string) (domain.Email, error)
 
 	// 2. Encrypt the password, and update the password for the given email.
-	UpdatePassword(ctx context.Context, email emails.Email, newPassword password.Ciphertext) error
+	UpdatePassword(ctx context.Context, email domain.Email, newPassword domain.Ciphertext) error
 }
 
 type ResetPasswordDto struct {
@@ -28,7 +26,7 @@ func (d ResetPasswordDto) Validate() error {
 		return errors.New("auth: token required")
 	}
 
-	return domain.Validate(password.Plaintext(d.NewPassword))
+	return domain.Validate(domain.Plaintext(d.NewPassword))
 }
 
 func ResetPassword(ctx context.Context, steps resetPassword, dto ResetPasswordDto) error {
@@ -41,7 +39,7 @@ func ResetPassword(ctx context.Context, steps resetPassword, dto ResetPasswordDt
 		return err
 	}
 
-	pwd := password.Plaintext(dto.NewPassword)
+	pwd := domain.Plaintext(dto.NewPassword)
 	newPwd, err := pwd.Encrypt()
 	if err != nil {
 		return err

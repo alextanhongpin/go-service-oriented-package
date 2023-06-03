@@ -4,12 +4,10 @@ import (
 	"context"
 
 	"github.com/alextanhongpin/go-service-oriented-package/domain"
-	"github.com/alextanhongpin/go-service-oriented-package/domain/emails"
-	"github.com/alextanhongpin/go-service-oriented-package/domain/password"
 )
 
 type login interface {
-	FindEncryptedPasswordByEmail(ctx context.Context, email emails.Email) (password.Ciphertext, error)
+	FindEncryptedPasswordByEmail(ctx context.Context, email domain.Email) (domain.Ciphertext, error)
 	WhenPasswordMatch(ctx context.Context, match bool) error
 }
 
@@ -19,11 +17,11 @@ type LoginDto struct {
 }
 
 func (d LoginDto) Validate() error {
-	if err := emails.Email(d.Email).Validate(); err != nil {
+	if err := domain.Email(d.Email).Validate(); err != nil {
 		return err
 	}
 
-	if err := password.Plaintext(d.Password).Validate(); err != nil {
+	if err := domain.Plaintext(d.Password).Validate(); err != nil {
 		return err
 	}
 
@@ -35,8 +33,8 @@ func Login(ctx context.Context, steps login, dto LoginDto) error {
 		return err
 	}
 
-	email := emails.Email(dto.Email)
-	password := password.Plaintext(dto.Password)
+	email := domain.Email(dto.Email)
+	password := domain.Plaintext(dto.Password)
 
 	ciphertext, err := steps.FindEncryptedPasswordByEmail(ctx, email)
 	if err != nil {

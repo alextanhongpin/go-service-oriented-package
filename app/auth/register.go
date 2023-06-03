@@ -5,14 +5,12 @@ import (
 	"errors"
 
 	"github.com/alextanhongpin/go-service-oriented-package/domain"
-	"github.com/alextanhongpin/go-service-oriented-package/domain/emails"
-	"github.com/alextanhongpin/go-service-oriented-package/domain/password"
 )
 
 type register interface {
-	CheckEmailExists(ctx context.Context, email emails.Email) (bool, error)
+	CheckEmailExists(ctx context.Context, email domain.Email) (bool, error)
 	WhenEmailExists(ctx context.Context, exists bool) error
-	CreateUser(ctx context.Context, name string, email emails.Email, ciphertext password.Ciphertext) error
+	CreateUser(ctx context.Context, name string, email domain.Email, ciphertext domain.Ciphertext) error
 }
 
 type RegisterDto struct {
@@ -27,8 +25,8 @@ func (d RegisterDto) Validate() error {
 	}
 
 	return domain.Validate(
-		emails.Email(d.Email),
-		password.Plaintext(d.Password),
+		domain.Email(d.Email),
+		domain.Plaintext(d.Password),
 	)
 }
 
@@ -38,7 +36,7 @@ func Register(ctx context.Context, steps register, dto RegisterDto) error {
 	}
 
 	name := dto.Name
-	email := emails.Email(dto.Email)
+	email := domain.Email(dto.Email)
 
 	exists, err := steps.CheckEmailExists(ctx, email)
 	if err != nil {
@@ -49,7 +47,7 @@ func Register(ctx context.Context, steps register, dto RegisterDto) error {
 		return err
 	}
 
-	password := password.Plaintext(dto.Password)
+	password := domain.Plaintext(dto.Password)
 	ciphertext, err := password.Encrypt()
 	if err != nil {
 		return err

@@ -1,9 +1,9 @@
-package password_test
+package domain_test
 
 import (
 	"testing"
 
-	"github.com/alextanhongpin/go-service-oriented-package/domain/password"
+	"github.com/alextanhongpin/go-service-oriented-package/domain"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -16,12 +16,12 @@ func TestPasswordFormat(t *testing.T) {
 		{
 			name:     "empty",
 			password: "",
-			wantErr:  password.ErrPasswordTooShort,
+			wantErr:  domain.ErrPasswordTooShort,
 		},
 		{
 			name:     "too short",
 			password: "1234567",
-			wantErr:  password.ErrPasswordTooShort,
+			wantErr:  domain.ErrPasswordTooShort,
 		},
 		{
 			name:     "spaces preserved",
@@ -60,7 +60,7 @@ func TestPasswordFormat(t *testing.T) {
 
 		t.Run(tc.name, func(t *testing.T) {
 			assert := assert.New(t)
-			err := password.Plaintext(tc.password).Validate()
+			err := domain.Plaintext(tc.password).Validate()
 			assert.ErrorIs(err, tc.wantErr, err)
 		})
 	}
@@ -69,7 +69,7 @@ func TestPasswordFormat(t *testing.T) {
 func TestEncryptCompare(t *testing.T) {
 	assert := assert.New(t)
 
-	pwd := password.Plaintext("12345678")
+	pwd := domain.Plaintext("12345678")
 	assert.Nil(pwd.Validate())
 
 	ciphertext, err := pwd.Encrypt()
@@ -77,6 +77,6 @@ func TestEncryptCompare(t *testing.T) {
 
 	assert.True(ciphertext.Compare(pwd))
 
-	anotherPwd := password.Plaintext("87654321")
+	anotherPwd := domain.Plaintext("87654321")
 	assert.False(ciphertext.Compare(anotherPwd))
 }

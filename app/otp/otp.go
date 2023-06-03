@@ -6,7 +6,6 @@ import (
 	"errors"
 
 	"github.com/alextanhongpin/go-service-oriented-package/domain"
-	"github.com/alextanhongpin/go-service-oriented-package/domain/phones"
 )
 
 var (
@@ -35,7 +34,7 @@ type SendOtpDto struct {
 }
 
 func (dto SendOtpDto) Validate() error {
-	if err := phones.PhoneNumber(dto.PhoneNumber).Validate(); err != nil {
+	if err := domain.PhoneNumber(dto.PhoneNumber).Validate(); err != nil {
 		return err
 	}
 
@@ -58,7 +57,7 @@ type VerifyOtpDto struct {
 }
 
 func (dto VerifyOtpDto) Validate() error {
-	if err := phones.PhoneNumber(dto.PhoneNumber).Validate(); err != nil {
+	if err := domain.PhoneNumber(dto.PhoneNumber).Validate(); err != nil {
 		return err
 	}
 
