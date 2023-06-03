@@ -14,6 +14,7 @@ func TestEmail(t *testing.T) {
 		assert.True(domain.Email("john.doe@mail.com").Valid())
 		assert.True(domain.Email("john.doe+1@mail.com").Valid())
 		assert.True(domain.Email("john.doe@hello.com").Valid())
+		assert.Nil(domain.Email("john.doe@hello.com").Validate())
 	})
 
 	t.Run("invalid", func(t *testing.T) {
@@ -21,5 +22,6 @@ func TestEmail(t *testing.T) {
 		assert.False(domain.Email("").Valid(), "zero")
 		assert.False(domain.Email("john.doe").Valid(), "no domain")
 		assert.False(domain.Email("john.doe@com").Valid())
+		assert.ErrorIs(domain.Email("john.doe@com").Validate(), domain.ErrEmailInvalid)
 	})
 }

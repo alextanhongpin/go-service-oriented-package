@@ -49,6 +49,27 @@ func (dto SendOtpDto) Validate() error {
 	return nil
 }
 
+func SendOtp(ctx context.Context, steps sendOtp, dto SendOtpDto) error {
+	if err := dto.Validate(); err != nil {
+		return err
+	}
+
+	if err := steps.Allow(ctx, dto); err != nil {
+		return err
+	}
+
+	otp, err := steps.GenerateOtp(ctx)
+	if err != nil {
+		return err
+	}
+
+	if err := steps.CreateSession(ctx, dto, otp); err != nil {
+		return err
+	}
+
+	return steps.SendMessage(ctx, dto, otp)
+}
+
 type VerifyOtpDto struct {
 	PhoneNumber   string `example:"+601243567890" desc:"Phone number in E164 format"`
 	IdempotentKey string `desc:"unique key to ensure the request is unique, e.g. using the md5 hash of the request"`
@@ -70,27 +91,6 @@ func (dto VerifyOtpDto) Validate() error {
 	}
 
 	return domain.OTP(dto.OTP).Validate()
-}
-
-func SendOtp(ctx context.Context, steps sendOtp, dto SendOtpDto) error {
-	if err := dto.Validate(); err != nil {
-		return err
-	}
-
-	if err := steps.Allow(ctx, dto); err != nil {
-		return err
-	}
-
-	otp, err := steps.GenerateOtp(ctx)
-	if err != nil {
-		return err
-	}
-
-	if err := steps.CreateSession(ctx, dto, otp); err != nil {
-		return err
-	}
-
-	return steps.SendMessage(ctx, dto, otp)
 }
 
 func VerifyOtp(ctx context.Context, steps verifyOtp, dto VerifyOtpDto) error {

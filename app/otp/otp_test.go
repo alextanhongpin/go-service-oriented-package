@@ -12,6 +12,54 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
+func TestSendOtpDto(t *testing.T) {
+	type args = otp.SendOtpDto
+
+	tests := []struct {
+		name    string
+		argsFn  func(args) args
+		wantErr error
+	}{
+		{
+			name: "empty phone number",
+			argsFn: func(a args) args {
+				a.PhoneNumber = ""
+				return a
+			},
+			wantErr: domain.ErrInvalidPhoneNumber,
+		},
+		{
+			name: "empty topic",
+			argsFn: func(a args) args {
+				a.Topic = ""
+				return a
+			},
+			wantErr: otp.ErrTopicRequired,
+		},
+		{
+			name: "empty idempotent key",
+			argsFn: func(a args) args {
+				a.IdempotentKey = ""
+				return a
+			},
+			wantErr: otp.ErrIdempotentKeyRequired,
+		},
+	}
+
+	for _, ts := range tests {
+		args := otp.SendOtpDto{
+			PhoneNumber:   "+60123456789",
+			Topic:         "payout",
+			IdempotentKey: "md5(req)",
+		}
+		args = ts.argsFn(args)
+
+		t.Run(ts.name, func(t *testing.T) {
+			assert.ErrorIs(t, args.Validate(), ts.wantErr)
+		})
+	}
+}
+
 func TestSendOtp(t *testing.T) {
 	type stub struct {
 		allowErr         error
@@ -24,14 +72,21 @@ func TestSendOtp(t *testing.T) {
 	wantErr := errors.New("want")
 
 	testCases := []struct {
-		name    string
-		stubFn  func(*stub)
-		wantErr error
+		name     string
+		stubFn   func(*stub)
+		zeroArgs bool
+		wantErr  error
 	}{
 		{
 			name:    "success",
 			stubFn:  func(stub *stub) {},
 			wantErr: nil,
+		},
+		{
+			name:     "validation error",
+			zeroArgs: true,
+			stubFn:   func(stub *stub) {},
+			wantErr:  domain.ErrInvalidPhoneNumber,
 		},
 		{
 			name: "allow error",
@@ -65,10 +120,13 @@ func TestSendOtp(t *testing.T) {
 	for _, tc := range testCases {
 		tc := tc
 
-		args := otp.SendOtpDto{
-			PhoneNumber:   "+60123456789",
-			Topic:         "payout",
-			IdempotentKey: "md5(req)",
+		var args otp.SendOtpDto
+		if !tc.zeroArgs {
+			args = otp.SendOtpDto{
+				PhoneNumber:   "+60123456789",
+				Topic:         "payout",
+				IdempotentKey: "md5(req)",
+			}
 		}
 
 		stub := stub{

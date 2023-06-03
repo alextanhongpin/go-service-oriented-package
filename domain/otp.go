@@ -2,6 +2,7 @@ package domain
 
 import (
 	"errors"
+	"fmt"
 	"strconv"
 )
 
@@ -18,7 +19,7 @@ func (otp OTP) Validate() error {
 
 	_, err := strconv.ParseInt(string(otp), 10, 64)
 	if err != nil {
-		return ErrOTPInvalidFormat
+		return fmt.Errorf("%w: %w", ErrOTPInvalidFormat, err)
 	}
 
 	return nil

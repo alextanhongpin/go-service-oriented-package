@@ -1,6 +1,7 @@
 package domain_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/alextanhongpin/go-service-oriented-package/domain"
@@ -22,6 +23,11 @@ func TestPasswordFormat(t *testing.T) {
 			name:     "too short",
 			password: "1234567",
 			wantErr:  domain.ErrPasswordTooShort,
+		},
+		{
+			name:     "too long",
+			password: strings.Repeat("1", 129),
+			wantErr:  domain.ErrPasswordTooLong,
 		},
 		{
 			name:     "spaces preserved",
@@ -79,4 +85,29 @@ func TestEncryptCompare(t *testing.T) {
 
 	anotherPwd := domain.Plaintext("87654321")
 	assert.False(ciphertext.Compare(anotherPwd))
+}
+
+func TestEncryptEmpty(t *testing.T) {
+	assert := assert.New(t)
+
+	pwd := domain.Plaintext("")
+	_, err := pwd.Encrypt()
+	assert.NotNil(err)
+}
+
+func TestPasswordString(t *testing.T) {
+	assert := assert.New(t)
+
+	pwd := domain.Plaintext("12345678")
+	assert.Equal("*PASSWORD REDACTED*", pwd.String())
+}
+
+func TestPasswordEqual(t *testing.T) {
+	assert := assert.New(t)
+
+	pwd1 := domain.Plaintext("12345678")
+	pwd2 := domain.Plaintext("12345678")
+	pwd3 := domain.Plaintext("87654321")
+	assert.True(pwd1.Equal(pwd2))
+	assert.False(pwd3.Equal(pwd2))
 }
