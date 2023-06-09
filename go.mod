@@ -6,6 +6,7 @@ require (
 	github.com/alextanhongpin/passwd v0.2.0
 	github.com/nyaruka/phonenumbers v1.1.7
 	github.com/stretchr/testify v1.8.4
+	golang.org/x/time v0.3.0
 )
 
 require (
