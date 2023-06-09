@@ -1,0 +1,3 @@
+# Idempotent
+
+Implementation of idempotency.
